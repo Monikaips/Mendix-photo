@@ -1,0 +1,322 @@
+diff --git a/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java b/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java
+index 7dc8983..935d0fc 100644
+--- a/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java
++++ b/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java
+@@ -146,78 +146,35 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+       File source = new File(mUri.getPath());
+       FileInputStream input = null;
+       OutputStream output = null;
+-
+-      String mimeType = Utils.getMimeType(mUri.toString());
+-      Boolean isVideo = mimeType != null && mimeType.contains("video");
++      String destinationAbsolutePath = null;
+ 
+       try {
++        String mimeType = Utils.getMimeType(mUri.toString());
++        boolean isVideo = mimeType != null && mimeType.contains("video");
++
+         String album = mOptions.getString("album");
+         boolean isAlbumPresent = !TextUtils.isEmpty(album);
+ 
+-        // Android Q and above
+-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+-          ContentValues mediaDetails = new ContentValues();
+-          if (isAlbumPresent) {
+-            String relativePath = Environment.DIRECTORY_DCIM + File.separator + album;
+-            mediaDetails.put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath);
+-          }
+-          mediaDetails.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+-          mediaDetails.put(Images.Media.DISPLAY_NAME, source.getName());
+-          mediaDetails.put(Images.Media.IS_PENDING, 1);
+-          ContentResolver resolver = mContext.getContentResolver();
+-          Uri mediaContentUri = isVideo
+-                  ? resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, mediaDetails)
+-                  : resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, mediaDetails);
+-          if (mediaContentUri == null) {
+-            mPromise.reject(ERROR_UNABLE_TO_LOAD, "ContentResolver#insert() returns null, insert failed");
+-          }
+-          output = resolver.openOutputStream(mediaContentUri);
+-          input = new FileInputStream(source);
+-          FileUtils.copy(input, output);
+-          mediaDetails.clear();
+-          mediaDetails.put(Images.Media.IS_PENDING, 0);
+-          resolver.update(mediaContentUri, mediaDetails, null, null);
+-
+-          Cursor cursor = resolver.query(
+-                  mediaContentUri,
+-                  PROJECTION,
+-                  null,
+-                  null,
+-                  null);
+-          if (cursor == null) {
+-            mPromise.reject(ERROR_UNABLE_TO_LOAD, "Failed to find the photo that was just saved!");
+-            return;
+-          }
+-          cursor.moveToFirst();
+-          WritableMap asset = convertMediaToMap(resolver,
+-                  cursor,
+-                  Set.of(INCLUDE_LOCATION,
+-                          INCLUDE_FILENAME,
+-                          INCLUDE_FILE_SIZE,
+-                          INCLUDE_FILE_EXTENSION,
+-                          INCLUDE_IMAGE_SIZE,
+-                          INCLUDE_PLAYABLE_DURATION,
+-                          INCLUDE_ORIENTATION,
+-                          INCLUDE_ALBUMS));
+-          cursor.close();
+-          mPromise.resolve(asset);
++        String topFolderName;
++        if (isAlbumPresent) {
++          topFolderName = isVideo
++                  ? Environment.DIRECTORY_MOVIES
++                  : Environment.DIRECTORY_PICTURES;
+         } else {
+-          final File environment;
+-          // Media is not saved into an album when using Environment.DIRECTORY_DCIM.
+-          if (isAlbumPresent) {
+-            if ("video".equals(mOptions.getString("type"))) {
+-              environment = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+-            } else {
+-              environment = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+-            }
+-          } else {
+-            environment = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM);
+-          }
++          topFolderName = Environment.DIRECTORY_DCIM;
++        }
++
++        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
++          final File environment =
++                  Environment.getExternalStoragePublicDirectory(topFolderName);
++
+           File exportDir;
+           if (isAlbumPresent) {
+             exportDir = new File(environment, album);
+             if (!exportDir.exists() && !exportDir.mkdirs()) {
+-              mPromise.reject(ERROR_UNABLE_TO_LOAD, "Album Directory not created. Did you request WRITE_EXTERNAL_STORAGE?");
++              mPromise.reject(
++                      ERROR_UNABLE_TO_LOAD,
++                      "Album Directory not created. Did you request WRITE_EXTERNAL_STORAGE?");
+               return;
+             }
+           } else {
+@@ -225,43 +182,106 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+           }
+ 
+           if (!exportDir.isDirectory()) {
+-            mPromise.reject(ERROR_UNABLE_TO_LOAD, "External media storage directory not available");
++            mPromise.reject(
++                    ERROR_UNABLE_TO_LOAD,
++                    "External media storage directory not available");
+             return;
+           }
+ 
+           File dest = new File(exportDir, source.getName());
+           int n = 0;
+           String fullSourceName = source.getName();
+-          String sourceName, sourceExt;
++          String sourceName;
++          String sourceExt;
++
+           if (fullSourceName.indexOf('.') >= 0) {
+             sourceName = fullSourceName.substring(0, fullSourceName.lastIndexOf('.'));
+             sourceExt = fullSourceName.substring(fullSourceName.lastIndexOf('.'));
+           } else {
++            String mimeTypeLocal = source.toURI().toURL().openConnection().getContentType();
+             sourceName = fullSourceName;
+-            sourceExt = "";
++            sourceExt = mimeTypeLocal != null && mimeTypeLocal.contains("/")
++                    ? "." + mimeTypeLocal.split("/")[1]
++                    : "";
++            dest = new File(exportDir, sourceName + sourceExt);
+           }
++
+           while (!dest.createNewFile()) {
+             dest = new File(exportDir, sourceName + "_" + (n++) + sourceExt);
+           }
++
+           input = new FileInputStream(source);
+           output = new FileOutputStream(dest);
+           ((FileOutputStream) output).getChannel()
+                   .transferFrom(input.getChannel(), 0, input.getChannel().size());
+-          input.close();
+-          output.close();
+-
+-          MediaScannerConnection.scanFile(
+-                  mContext,
+-                  new String[]{dest.getAbsolutePath()},
+-                  null,
+-                  (path, uri) -> {
++
++          destinationAbsolutePath = dest.getAbsolutePath();
++
++        } else {
++          ContentValues values = new ContentValues();
++          values.put(MediaStore.Images.Media.DISPLAY_NAME, source.getName());
++          values.put(MediaStore.Images.Media.MIME_TYPE, mimeType);
++          values.put(
++                  MediaStore.MediaColumns.RELATIVE_PATH,
++                  topFolderName + (isAlbumPresent ? File.separator + album : ""));
++
++          values.put(MediaStore.MediaColumns.IS_PENDING, 1);
++
++          ContentResolver resolver = mContext.getContentResolver();
++
++          Uri mediaUri = isVideo
++                  ? resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
++                  : resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
++
++          if (mediaUri == null) {
++            mPromise.reject(
++                    ERROR_UNABLE_TO_LOAD,
++                    "ContentResolver#insert() returns null, insert failed");
++            return;
++          }
++
++          output = resolver.openOutputStream(mediaUri);
++          Utils.copy(source, output);
++
++          values.clear();
++          values.put(MediaStore.Images.Media.IS_PENDING, 0);
++          resolver.update(mediaUri, values, null, null);
++
++          destinationAbsolutePath = Utils.getNameFromContentUri(mContext, mediaUri);
++
++          if (TextUtils.isEmpty(destinationAbsolutePath)) {
++            destinationAbsolutePath = mediaUri.toString();
++          }
++        }
++
++        final String destinationPath = destinationAbsolutePath;
++
++        MediaScannerConnection.scanFile(
++                mContext,
++                new String[]{destinationPath},
++                null,
++                new MediaScannerConnection.OnScanCompletedListener() {
++                  @Override
++                  public void onScanCompleted(String path, Uri uri) {
+                     if (uri != null) {
+-                      mPromise.resolve(uri.toString());
++                      WritableNativeMap image = new WritableNativeMap();
++                      image.putString("uri", uri.toString());
++
++                      WritableNativeMap node = new WritableNativeMap();
++                      node.putMap("image", image);
++
++                      WritableNativeMap result = new WritableNativeMap();
++                      result.putMap("node", node);
++
++                      mPromise.resolve(result);
+                     } else {
+-                      mPromise.reject(ERROR_UNABLE_TO_SAVE, "Could not add image to gallery");
++                      mPromise.reject(
++                              ERROR_UNABLE_TO_SAVE,
++                              "Could not add image to gallery");
+                     }
+-                  });
+-        }
++                  }
++                });
++
+       } catch (IOException e) {
+         mPromise.reject(e);
+       } finally {
+@@ -272,6 +292,7 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+             FLog.e(ReactConstants.TAG, "Could not close input channel", e);
+           }
+         }
++
+         if (output != null) {
+           try {
+             output.close();
+@@ -280,11 +301,7 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+           }
+         }
+       }
+-    }
+-  }
+-
+-  /**
+-   * Get photos from {@link MediaStore.Images}, most recent first.
++    }otos from {@link MediaStore.Images}, most recent first.
+    *
+    * @param params  a map containing the following keys:
+    *                <ul>
+@@ -1060,3 +1077,4 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+     promise.reject("CameraRoll:getPhotoThumbnail", "getPhotoThumbnail is not supported on Android");
+   }
+ }
++
+diff --git a/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/Utils.java b/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/Utils.java
+index a87bedf..b9966c7 100644
+--- a/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/Utils.java
++++ b/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/Utils.java
+@@ -1,6 +1,19 @@
+ package com.reactnativecommunity.cameraroll;
+ 
+ import android.webkit.MimeTypeMap;
++import android.content.ContentResolver;
++import android.content.Context;
++import android.database.Cursor;
++import android.net.Uri;
++import android.os.Build;
++import android.provider.MediaStore;
++import android.os.FileUtils;
++
++import java.io.File;
++import java.io.FileInputStream;
++import java.io.IOException;
++import java.io.InputStream;
++import java.io.OutputStream;
+ 
+ public class Utils {
+ 
+@@ -18,4 +31,47 @@ public class Utils {
+         return extension;
+     }
+ 
++    public static void copy(File src, OutputStream out) throws IOException {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
++            try (InputStream in = new FileInputStream(src)) {
++                FileUtils.copy(in, out);
++            }
++        } else {
++            try (InputStream in = new FileInputStream(src)) {
++                byte[] buffer = new byte[8192];
++                int len;
++                while ((len = in.read(buffer)) != -1) {
++                    out.write(buffer, 0, len);
++                }
++            }
++        }
++    }
++
++    public static String getNameFromContentUri(Context context, Uri contentUri) {
++        ContentResolver contentResolver = context.getContentResolver();
++        Cursor cursor = contentResolver.query(contentUri, null, null, null, null);
++        if (cursor != null && cursor.moveToFirst()) {
++            String[] splittedContentUri = contentUri.toString().split("/");
++            String document_id = splittedContentUri[splittedContentUri.length - 1];
++            cursor.close();
++
++            cursor = contentResolver.query(
++                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
++                null,
++                MediaStore.Images.Media._ID + " = ? ",
++                new String[]{document_id},
++                null);
++
++            if (cursor != null && cursor.moveToFirst()) {
++                String path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA));
++                cursor.close();
++                return path;
++            }
++
++            if (cursor != null) {
++                cursor.close();
++            }
++        }
++        return "";
++    }
+ }
