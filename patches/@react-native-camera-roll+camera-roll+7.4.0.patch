@@ -1,5 +1,5 @@
 diff --git a/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java b/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java
-index 7dc8983..078d830 100644
+index 7dc8983..5c4c88d 100644
 --- a/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java
 +++ b/node_modules/@react-native-camera-roll/camera-roll/android/src/main/java/com/reactnativecommunity/cameraroll/CameraRollModule.java
 @@ -146,78 +146,35 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
@@ -230,18 +230,17 @@ index 7dc8983..078d830 100644
          if (output != null) {
            try {
              output.close();
-@@ -280,10 +301,6 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+@@ -280,9 +301,9 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
            }
          }
        }
--    }
--  }
--
--  /**
+     }
+   }
+   
+   /**
     * Get photos from {@link MediaStore.Images}, most recent first.
     *
-    * @param params  a map containing the following keys:
-@@ -1060,3 +1077,4 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
+@@ -1060,3 +1078,4 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
      promise.reject("CameraRoll:getPhotoThumbnail", "getPhotoThumbnail is not supported on Android");
    }
  }
