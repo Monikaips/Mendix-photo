@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java b/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java
+index 1b36ed8..cf4196d 100644
+--- a/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java
++++ b/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java
+@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.mockito.Mockito.doReturn;
+ import static org.mockito.Mockito.spy;
+ 
+-class DeviceIdResolverTest {
++public class DeviceIdResolverTest {
+ 
+   @Mock
+   Context context;
