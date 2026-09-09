@@ -1,3 +1,23 @@
+diff --git a/node_modules/react-native-device-info/android/build.gradle b/node_modules/react-native-device-info/android/build.gradle
+index e352534..9f5c528 100644
+--- a/node_modules/react-native-device-info/android/build.gradle
++++ b/node_modules/react-native-device-info/android/build.gradle
+@@ -40,11 +40,12 @@ android {
+     lintOptions {
+        warning 'InvalidPackage', 'MissingPermission'
+     }
+-    testOptions {
+-        unitTests.returnDefaultValues = true
++testOptions {
++    unitTests {
++        returnDefaultValues = true
++        useJUnitPlatform()
+     }
+ }
+-
+ repositories {
+     mavenCentral()
+     google()
 diff --git a/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java b/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java
 index 1b36ed8..cf4196d 100644
 --- a/node_modules/react-native-device-info/android/src/test/java/com/learnium/RNDeviceInfo/resolver/DeviceIdResolverTest.java
